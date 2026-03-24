@@ -1,0 +1,86 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+# デフォルトは全権限を拒否
+permissions: {}
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            goos: linux
+            goarch: amd64
+          - os: macos-latest
+            goos: darwin
+            goarch: arm64
+          - os: windows-latest
+            goos: windows
+            goarch: amd64
+
+    runs-on: ${{ matrix.os }}
+
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
+        with:
+          go-version-file: go.mod
+
+      - name: Install gcc (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: sudo apt-get install -y gcc
+
+      - name: Build
+        shell: bash
+        run: |
+          go build -o kioku${{ matrix.goos == 'windows' && '.exe' || '' }} ./cmd/kioku/
+        env:
+          CGO_ENABLED: "1"
+
+      - name: Archive (Unix)
+        if: matrix.goos != 'windows'
+        run: |
+          mkdir dist
+          cp kioku dist/
+          tar -czf kioku-${{ matrix.goos }}-${{ matrix.goarch }}.tar.gz -C dist kioku
+
+      - name: Archive (Windows)
+        if: matrix.goos == 'windows'
+        shell: bash
+        run: |
+          mkdir dist
+          cp kioku.exe dist/
+          cd dist && 7z a ../kioku-${{ matrix.goos }}-${{ matrix.goarch }}.zip kioku.exe
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: kioku-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: kioku-${{ matrix.goos }}-${{ matrix.goarch }}.*
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write # リリース作成に必要
+
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Create Release
+        uses: softprops/action-gh-release@153bb8e04406b158c6c84fc1615b65b24149a1fe # v2.6.1
+        with:
+          files: artifacts/*
+          generate_release_notes: true
