@@ -92,15 +92,24 @@ func runAdd(args []string) {
 	}
 	defer embedder.Close()
 
-	emb, err := embedder.Embed(content)
-	if err != nil {
-		log.Fatalf("embedding: %v", err)
-	}
-
-	mem, err := store.Add(content, *source, tags, emb)
+	mem, err := store.Add(content, *source, tags)
 	if err != nil {
 		log.Fatalf("store: %v", err)
 	}
 
-	fmt.Printf("保存しました。id: %s\n", mem.ID)
+	texts := storage.ChunkText(content)
+	chunks := make([]storage.MemoryChunk, len(texts))
+	for i, t := range texts {
+		emb, err := embedder.Embed(t)
+		if err != nil {
+			log.Fatalf("embedding chunk %d: %v", i, err)
+		}
+		chunks[i] = storage.MemoryChunk{ChunkIdx: i, Text: t, Embedding: emb}
+	}
+
+	if err := store.AddChunks(mem.ID, chunks); err != nil {
+		log.Fatalf("store chunks: %v", err)
+	}
+
+	fmt.Printf("保存しました。id: %s（%d チャンク）\n", mem.ID, len(chunks))
 }
