@@ -1,7 +1,7 @@
 # kioku — セマンティック記憶 MCP サーバー
 
 Claude Code に「記憶」を持たせる MCP サーバー。
-hugot（Go内 ONNX推論）でローカル埋め込み生成 → SQLite に保存 → コサイン類似度でセマンティック検索。
+hugot（Go内 ONNX推論）でローカル埋め込み生成 → SQLite に保存 → チャンクベースのセマンティック検索＋リランキング。
 **Ollama 不要。モデルは初回起動時に HuggingFace から自動DL。**
 
 ## アーキテクチャ
@@ -12,7 +12,7 @@ kioku/
 ├── internal/
 │   ├── config/config.go           # 設定（XDG Base Dir / env var）
 │   ├── embedding/embedding.go     # hugot で ONNX 推論（HF 自動DL）
-│   ├── storage/storage.go         # SQLite CRUD + pure Go コサイン検索
+│   ├── storage/storage.go         # SQLite CRUD + チャンク分割 + ベクトル検索 + リランキング
 │   └── server/server.go           # MCP サーバー + 4ツール
 └── go.mod
 ```
@@ -37,7 +37,6 @@ kioku/
 | OS | アーカイブ |
 |---|---|
 | macOS (Apple Silicon) | `kioku-darwin-arm64.tar.gz` |
-| macOS (Intel) | `kioku-darwin-amd64.tar.gz` |
 | Linux | `kioku-linux-amd64.tar.gz` |
 | Windows | `kioku-windows-amd64.zip` |
 
@@ -176,9 +175,9 @@ chmod +x ~/.claude/hooks/save-session-to-kioku.sh
 
 | ツール | 必須引数 | 任意引数 | 説明 |
 |---|---|---|---|
-| `memory_add` | `content` | `source`, `tags` | 記憶を保存 |
-| `memory_search` | `query` | `n` (default: 5) | セマンティック検索 |
-| `memory_recent` | — | `n` (default: 10), `source` | 最近の記憶を取得 |
+| `memory_add` | `content` | `source`, `tags` | 記憶を保存。本文をチャンク分割して各チャンクを embedding 化 |
+| `memory_search` | `query` | `n` (default: 5), `max_chars` | チャンクベースのセマンティック検索。ベクトル・キーワード・新しさでリランキング |
+| `memory_recent` | — | `n` (default: 10), `source`, `max_chars` | 最近の記憶を取得 |
 | `memory_delete` | `id` | — | 記憶を削除 |
 
 ## CLI サブコマンド
@@ -205,5 +204,3 @@ hugot 対応の多言語モデルに切り替え:
 ```bash
 export KIOKU_EMBED_MODEL=KnightsAnalytics/paraphrase-multilingual-mpnet-base-v2
 ```
-# kioku
-# kioku
