@@ -10,18 +10,21 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/yamd1/kioku/internal/embedding"
 	"github.com/yamd1/kioku/internal/storage"
+	"github.com/yamd1/kioku/internal/summarizer"
 )
 
 type Server struct {
-	store     *storage.Store
-	embedder  *embedding.Embedder
-	mcpServer *server.MCPServer
+	store      *storage.Store
+	embedder   *embedding.Embedder
+	summarizer *summarizer.Summarizer
+	mcpServer  *server.MCPServer
 }
 
 func New(store *storage.Store, embedder *embedding.Embedder) *Server {
 	s := &Server{
-		store:    store,
-		embedder: embedder,
+		store:      store,
+		embedder:   embedder,
+		summarizer: summarizer.New(embedder),
 	}
 
 	mcpSrv := server.NewMCPServer(
@@ -102,12 +105,18 @@ func (s *Server) handleMemoryAdd(ctx context.Context, req mcp.CallToolRequest) (
 		}
 	}
 
-	mem, err := s.store.Add(content, source, tags)
+	// 要約してから保存・embedding する
+	summarized, err := s.summarizer.Summarize(content)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("summarize failed: %v", err)), nil
+	}
+
+	mem, err := s.store.Add(summarized, source, tags)
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("store failed: %v", err)), nil
 	}
 
-	texts := storage.ChunkText(content)
+	texts := storage.ChunkText(summarized)
 	chunks := make([]storage.MemoryChunk, len(texts))
 	for i, t := range texts {
 		emb, err := s.embedder.Embed(t)

@@ -12,6 +12,7 @@ import (
 	"github.com/yamd1/kioku/internal/embedding"
 	"github.com/yamd1/kioku/internal/server"
 	"github.com/yamd1/kioku/internal/storage"
+	"github.com/yamd1/kioku/internal/summarizer"
 )
 
 func main() {
@@ -92,12 +93,18 @@ func runAdd(args []string) {
 	}
 	defer embedder.Close()
 
-	mem, err := store.Add(content, *source, tags)
+	summ := summarizer.New(embedder)
+	summarized, err := summ.Summarize(content)
+	if err != nil {
+		log.Fatalf("summarize: %v", err)
+	}
+
+	mem, err := store.Add(summarized, *source, tags)
 	if err != nil {
 		log.Fatalf("store: %v", err)
 	}
 
-	texts := storage.ChunkText(content)
+	texts := storage.ChunkText(summarized)
 	chunks := make([]storage.MemoryChunk, len(texts))
 	for i, t := range texts {
 		emb, err := embedder.Embed(t)
