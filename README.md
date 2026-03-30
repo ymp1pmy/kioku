@@ -32,7 +32,7 @@ kioku/
 
 **リリースからダウンロード（推奨）**
 
-[Releases](https://github.com/yamd1/kioku/releases) から環境に合ったアーカイブをダウンロード。
+[Releases](https://github.com/ymp1pmy/kioku/releases) から環境に合ったアーカイブをダウンロード。
 
 | OS | アーカイブ |
 |---|---|
